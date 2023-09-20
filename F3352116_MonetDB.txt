@@ -1,0 +1,179 @@
+		-LOADER FUNCTION-
+
+CREATE LOADER loader_dataset() LANGUAGE PYTHON {
+
+	import pandas as pd 
+	df = pd.read_csv('C:/Users/pipos/Desktop/zillow.csv')
+	for i in range(0, len(df)):
+	    feature = df.loc[i]
+	    _emit.emit({'title': feature[0], 'address': feature[1], 
+	                'city': feature[2], 'state': feature[3],
+	                'postal_code': feature[4], 'price': feature[5],
+	                'facts and features': feature[6],
+	                'real estate provider': feature[7], 'url': feature[8]})};
+
+CREATE TABLE dataset FROM LOADER loader_dataset();
+ 
+SELECT * FROM dataset 
+LIMIT 5
+ 
+			-Q1-
+
+
+create function retrieve_bedrooms (i string) returns integer  
+language PYTHON
+{
+    bedrooms = []
+    for st in i:
+        st = st.split(",")[0]
+        st = st.split(" ")[0] 
+        if st == "None":
+            st = 0
+        bedrooms.append(int(st))
+    return bedrooms
+};
+
+select retrieve_bedrooms(dataset."facts and features") AS  bedrooms from dataset limit 10;
+
+			-Q2-
+
+create function retrieve_bathrooms(i string) returns integer
+language PYTHON
+{
+    bathrooms = []
+    for st in i:
+        st = st.split(",")[1].split(" ")[1]
+        st=st.split(".")[0]
+        if (st == "No") or (st == "None"): 
+            st = "0"
+        bathrooms.append(int(st))
+    return bathrooms	
+};
+
+
+select retrieve_bathrooms(dataset."facts and features") AS bathrooms  from dataset limit 10;
+
+			-Q3-
+
+create function retrieve_sq_ft(i string) returns integer
+language PYTHON
+{
+    sqft = []
+    for st in i:
+        st = st.split(",")[2].split(" ")[0]
+        sqft.append(int(st))
+    return sqft	
+};
+
+select retrieve_sq_ft(dataset."facts and features") AS SQFT from dataset limit 10;	
+
+			-Q4-
+
+create function retrieve_type(i string) returns string 
+language PYTHON
+{
+    type= []
+    for st in i:
+        st=st.split()[0]
+        accepted_list=["Condo", "House","Lot" ]
+        if st not in accepted_list:
+            type.append("UknownType")
+        else:
+            type.append(st)
+    return type	
+};
+
+select retrieve_type(dataset."title")  AS TYPE from dataset limit 10;
+
+			-Q5-
+
+create function retrieve_offer(i string) returns string 
+language PYTHON
+{
+    offer = []
+    for st in i:
+        st=st.split()[-1]
+        if st == "construction":
+            offer.append("sale")
+        elif st == "Foreclosure":
+            offer.append("forclose")                
+        else:
+            offer.append(st)
+    return offer
+};
+
+select retrieve_offer(dataset."title") as OFFER from dataset limit 10;
+
+			-Q6-
+
+SELECT * 
+FROM dataset
+WHERE retrieve_offer(dataset."title") LIKE '%sale%' limit 10;
+
+		   -Statistics Q6-
+
+SELECT COUNT(*) AS  number_of_listins_which_are_for_sale
+FROM dataset
+WHERE retrieve_offer(dataset."title") LIKE '%sale%' limit 10;
+
+			-Q7-
+
+create function retrieve_filter_price(i string) returns integer
+language PYTHON
+{
+    price_filtered = []
+    for st in i:
+        price = st[1:] 
+        numeric_filter = filter(str.isdigit, price)
+        numeric_string = "".join(numeric_filter)
+        price_filtered.append(int(numeric_string))
+    return price_filtered	
+};
+
+select retrieve_filter_price(dataset."price")  as price from dataset limit 10;
+
+			-Q8-
+
+SELECT * 
+FROM dataset
+WHERE retrieve_bedrooms(dataset."facts and features") < 11 limit 10;
+
+		    -Statistics Q8-
+
+SELECT  COUNT(*) AS number_of_listings_less_than_11_bedrooms
+FROM dataset
+WHERE retrieve_bedrooms(dataset."facts and features") < 11 limit 10;
+
+			-Q9-
+
+SELECT * 
+FROM dataset 
+WHERE retrieve_filter_price(dataset."price") < 20000000 AND retrieve_filter_price(dataset."price") > 100000  limit 10;
+
+		    -Statistics Q9-
+
+SELECT COUNT(*) AS listings_with_price_from_2m_to_100k
+FROM dataset 
+WHERE retrieve_filter_price(dataset."price") < 20000000 AND retrieve_filter_price(dataset."price") > 100000  limit 10;
+
+			-Q10-
+
+SELECT * 
+FROM dataset 
+WHERE retrieve_type(dataset."title") LIKE '%House%'  limit 10;
+
+ 		   -Statistics Q10-
+
+SELECT  COUNT(*) AS number_of_listins_which_are_houses 
+FROM dataset 
+WHERE retrieve_type(dataset."title") LIKE '%House%'  limit 10;
+
+ 			-Q11-
+
+SELECT retrieve_bedrooms(dataset."facts and features") AS bedrooms, AVG(retrieve_filter_price(dataset."price")/retrieve_sq_ft(dataset."facts and features")) AS average_price_per_sqft from dataset 
+WHERE (title = 'House for sale')  AND (retrieve_sq_ft(dataset."facts and features") <> 0) 
+GROUP BY retrieve_bedrooms(dataset."facts and features") 
+ORDER BY retrieve_bedrooms(dataset."facts and features") ASC;
+
+
+
